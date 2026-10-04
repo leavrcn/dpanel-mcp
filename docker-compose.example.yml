@@ -1,0 +1,61 @@
+# DPanel + DPanel MCP Server — two-container deployment example.
+#
+# Usage:
+#   1. docker compose -f mcp/docker-compose.example.yml up -d
+#   2. Create the founder account (first run only, no auth needed):
+#        curl -s http://127.0.0.1:8807/dpanel/api/common/user/create-founder \
+#          -H 'Content-Type: application/json' \
+#          -d '{"username":"admin","password":"ChangeMe-2026!","confirmPassword":"ChangeMe-2026!"}'
+#   3. Point your MCP client at http://127.0.0.1:8090/mcp
+#      with header `Authorization: Bearer <DPANEL_MCP_AUTH_TOKEN>`.
+#
+# Notes:
+#   - DPANEL_MCP_AUTH_TOKEN below is a placeholder — replace it.
+#   - DP_JWT_SECRET is fixed so DPanel restarts keep MCP sessions valid.
+#   - The MCP container needs no docker.sock; it talks plain HTTP to DPanel.
+
+services:
+  dpanel:
+    image: dpanel/dpanel:latest          # 1.11.0 at time of writing
+    container_name: dpanel
+    restart: unless-stopped
+    ports:
+      - "8807:8080"                       # DPanel web UI / API
+    environment:
+      APP_NAME: dpanel
+      DP_JWT_SECRET: "change-me-fixed-secret"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - dpanel-data:/dpanel
+    networks:
+      - dpanel-net
+
+  dpanel-mcp:
+    build:
+      context: ./                          # = mcp/ (compose resolves relative to this file)
+      dockerfile: Dockerfile
+    image: dpanel-mcp:latest
+    container_name: dpanel-mcp
+    restart: unless-stopped
+    depends_on:
+      - dpanel
+    ports:
+      - "8090:8090"                        # MCP streamable-http endpoint
+    environment:
+      DPANEL_HOST: http://dpanel:8080      # service name, internal port
+      DPANEL_USERNAME: admin
+      DPANEL_PASSWORD: "ChangeMe-2026!"
+      DPANEL_MCP_TRANSPORT: streamable-http
+      DPANEL_MCP_HTTP_HOST: 0.0.0.0
+      DPANEL_MCP_HTTP_PORT: "8090"
+      DPANEL_MCP_HTTP_PATH: /mcp
+      DPANEL_MCP_AUTH_TOKEN: "replace-with-a-long-random-token"
+      DPANEL_MCP_PROFILE: read-write
+    networks:
+      - dpanel-net
+
+networks:
+  dpanel-net:
+
+volumes:
+  dpanel-data:
