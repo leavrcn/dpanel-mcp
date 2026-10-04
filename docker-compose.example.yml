@@ -15,6 +15,11 @@
 #   - 所有 CHANGE_ME 均为占位符，生产环境必须替换
 #   - DP_JWT_SECRET 固定后 DPanel 重启不会使 MCP 会话失效
 #   - dpanel-mcp 容器无需挂载 docker.sock，仅通过 HTTP 与 DPanel 通信
+#
+# 存储路径：
+#   - dpanel 数据默认绑定挂载到宿主机 /opt/dpanel（备份/迁移直接打包该目录即可），
+#     可自行改为其他绝对路径，或用相对路径 ./data/dpanel 跟随 compose 文件
+#   - dpanel-mcp 为无状态容器（配置全走环境变量），无需任何存储卷
 
 services:
   dpanel:
@@ -28,7 +33,7 @@ services:
       DP_JWT_SECRET: "CHANGE_ME_FIXED_JWT_SECRET"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - dpanel-data:/dpanel
+      - /opt/dpanel:/dpanel            # DPanel 数据（数据库/compose 项目/网站），改为你的宿主机路径
     networks:
       - dpanel-net
     healthcheck:
@@ -65,8 +70,4 @@ services:
 
 networks:
   dpanel-net:
-
-volumes:
-  dpanel-data:
-    driver: local
 
