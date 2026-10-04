@@ -16,7 +16,8 @@
 #
 #   4. docker compose up -d
 #
-#   5. 首次启动创建 DPanel founder 账号（免鉴权接口）：
+#   5. 首次启动创建 DPanel founder 账号（免鉴权接口，仅可调用一次）：
+#      如果你已打开 DPanel 页面并注册过账号，跳过此步骤，.env 填页面注册的密码即可。
 #        curl -s http://127.0.0.1:8807/dpanel/api/common/user/create-founder \
 #          -H 'Content-Type: application/json' \
 #          -d '{"username":"admin","password":"<同 .env 中 DPANEL_ADMIN_PASSWORD>","confirmPassword":"<同 .env 中 DPANEL_ADMIN_PASSWORD>"}'
