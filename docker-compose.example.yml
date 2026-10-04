@@ -1,55 +1,64 @@
-# DPanel + DPanel MCP Server — two-container deployment example.
+# DPanel + dpanel-mcp 联合部署示例
+# 版本对齐：dpanel/dpanel:1.11.0 ↔ dpanel-mcp 1.11.0
 #
-# Usage:
-#   1. docker compose -f mcp/docker-compose.example.yml up -d
-#   2. Create the founder account (first run only, no auth needed):
+# 使用步骤：
+#   1. 拷贝本文件为 docker-compose.yml 并替换所有 CHANGE_ME 占位符
+#   2. docker compose up -d
+#   3. 首次启动创建 DPanel founder 账号（免鉴权接口）：
 #        curl -s http://127.0.0.1:8807/dpanel/api/common/user/create-founder \
 #          -H 'Content-Type: application/json' \
-#          -d '{"username":"admin","password":"ChangeMe-2026!","confirmPassword":"ChangeMe-2026!"}'
-#   3. Point your MCP client at http://127.0.0.1:8090/mcp
-#      with header `Authorization: Bearer <DPANEL_MCP_AUTH_TOKEN>`.
+#          -d '{"username":"admin","password":"你的强密码","confirmPassword":"你的强密码"}'
+#   4. MCP 客户端接入 http://127.0.0.1:8090/mcp
+#      请求头：Authorization: Bearer <DPANEL_MCP_AUTH_TOKEN 的值>
 #
-# Notes:
-#   - DPANEL_MCP_AUTH_TOKEN below is a placeholder — replace it.
-#   - DP_JWT_SECRET is fixed so DPanel restarts keep MCP sessions valid.
-#   - The MCP container needs no docker.sock; it talks plain HTTP to DPanel.
+# 注意：
+#   - 所有 CHANGE_ME 均为占位符，生产环境必须替换
+#   - DP_JWT_SECRET 固定后 DPanel 重启不会使 MCP 会话失效
+#   - dpanel-mcp 容器无需挂载 docker.sock，仅通过 HTTP 与 DPanel 通信
 
 services:
   dpanel:
-    image: dpanel/dpanel:latest          # 1.11.0 at time of writing
+    image: dpanel/dpanel:1.11.0
     container_name: dpanel
     restart: unless-stopped
     ports:
-      - "8807:8080"                       # DPanel web UI / API
+      - "8807:8080"                        # DPanel Web UI / API
     environment:
       APP_NAME: dpanel
-      DP_JWT_SECRET: "change-me-fixed-secret"
+      DP_JWT_SECRET: "CHANGE_ME_FIXED_JWT_SECRET"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - dpanel-data:/dpanel
     networks:
       - dpanel-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/dpanel/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   dpanel-mcp:
     build:
-      context: ./                          # = mcp/ (compose resolves relative to this file)
+      context: ./
       dockerfile: Dockerfile
-    image: dpanel-mcp:latest
+    image: dpanel-mcp:1.11.0
     container_name: dpanel-mcp
     restart: unless-stopped
     depends_on:
-      - dpanel
+      dpanel:
+        condition: service_healthy
     ports:
-      - "8090:8090"                        # MCP streamable-http endpoint
+      - "8090:8090"                        # MCP streamable-http 端点
     environment:
-      DPANEL_HOST: http://dpanel:8080      # service name, internal port
+      DPANEL_HOST: http://dpanel:8080      # compose 内部服务名 + 容器内部端口
       DPANEL_USERNAME: admin
-      DPANEL_PASSWORD: "ChangeMe-2026!"
+      DPANEL_PASSWORD: "CHANGE_ME_ADMIN_PASSWORD"
       DPANEL_MCP_TRANSPORT: streamable-http
       DPANEL_MCP_HTTP_HOST: 0.0.0.0
       DPANEL_MCP_HTTP_PORT: "8090"
       DPANEL_MCP_HTTP_PATH: /mcp
-      DPANEL_MCP_AUTH_TOKEN: "replace-with-a-long-random-token"
+      DPANEL_MCP_AUTH_TOKEN: "CHANGE_ME_LONG_RANDOM_TOKEN"
       DPANEL_MCP_PROFILE: read-write
     networks:
       - dpanel-net

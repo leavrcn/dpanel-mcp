@@ -1,4 +1,4 @@
-"""Async DPanel HTTP client with JWT login and transparent token refresh."""
+"""异步 DPanel HTTP 客户端，支持 JWT 登录与透明 token 续期"""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from .config import Config
 
 
 class DPanelApiError(Exception):
-    """Raised when DPanel returns an error envelope or non-2xx status."""
+    """DPanel 返回错误信封或非 2xx 状态时抛出"""
 
     def __init__(self, message: str, status_code: int | None = None, payload: Any = None):
         super().__init__(message)
@@ -21,13 +21,13 @@ class DPanelApiError(Exception):
 
 
 class DPanelClient:
-    """Thin async client over the DPanel panel API (/dpanel/api).
+    """DPanel 面板 API（/dpanel/api）的轻量异步客户端。
 
-    Auth model (verified against the Go sources):
+    鉴权模型（对照 Go 源码验证）：
       - POST /dpanel/api/common/user/login  {username, password, autoLogin}
-        -> {code: 0, data: {token: <JWT>}}  (HS256; 24h, or 30d when autoLogin)
-      - All other endpoints expect header  Authorization: Bearer <JWT>
-      - All business endpoints are POST with a JSON body (even reads).
+        -> {code: 0, data: {token: <JWT>}}（HS256；24 小时，autoLogin 时 30 天）
+      - 其余端点均要求请求头 Authorization: Bearer <token>
+      - 所有业务端点均为 POST + JSON body（包括查询类）。
     """
 
     def __init__(self, config: Config):
@@ -45,7 +45,7 @@ class DPanelClient:
     # ------------------------------------------------------------------ auth
 
     async def login(self) -> str:
-        """Log in and cache the JWT. Safe to call concurrently."""
+        """登录并缓存 JWT，并发安全"""
         async with self._lock:
             resp = await self._http.post(
                 "/common/user/login",
@@ -60,8 +60,8 @@ class DPanelClient:
             if not token:
                 raise DPanelApiError(f"login succeeded but no token in response: {data!r}")
             self._token = token
-            # JWT lifetime: 24h, or 30d with autoLogin. Decode exp if possible,
-            # otherwise assume the documented lifetime minus the refresh skew.
+            # JWT 有效期：24 小时，autoLogin 时 30 天。优先解析 exp 字段，
+            # 解析失败时按文档有效期减去刷新偏移量估算。
             self._token_exp = self._decode_jwt_exp(token) or (
                 time.time()
                 + (86400 * 30 if self.config.dpanel_auto_login else 86400)
@@ -94,8 +94,8 @@ class DPanelClient:
     def _unwrap(resp: httpx.Response, expect_auth: bool = True) -> Any:
         if resp.status_code == 401 and expect_auth:
             raise DPanelApiError("unauthorized (token expired or invalid)", 401)
-        # DPanel serves the SPA shell (HTML, HTTP 200) for unknown /dpanel/api routes.
-        # Detect that and give an actionable message instead of raw HTML.
+        # DPanel 对未知的 /dpanel/api 路由返回 SPA 页面（HTML，HTTP 200）。
+        # 识别这种情况并给出可操作的错误信息，而不是透传原始 HTML。
         content_type = resp.headers.get("content-type", "")
         if "text/html" in content_type or resp.text.lstrip().startswith("<!DOCTYPE"):
             req_path = ""
@@ -116,7 +116,7 @@ class DPanelClient:
                 f"non-JSON response (HTTP {resp.status_code}): {resp.text[:200]}",
                 resp.status_code,
             )
-        # DPanel envelope: {code: 200, data: ...} on success; {code: N, error: ...} otherwise.
+        # DPanel 信封格式：成功 {code: 200, data: ...}；失败 {code: N, error: ...}。
         code = body.get("code", 0)
         if code not in (0, 200):
             raise DPanelApiError(
@@ -127,7 +127,7 @@ class DPanelClient:
         return body.get("data")
 
     async def post(self, path: str, payload: dict | None = None, _retry: bool = True) -> Any:
-        """POST to a panel API endpoint (path relative to /dpanel/api)."""
+        """POST 请求面板 API 端点（路径相对于 /dpanel/api）"""
         token = await self._ensure_token()
         resp = await self._http.post(
             path,
@@ -135,7 +135,7 @@ class DPanelClient:
             headers={"Authorization": f"Bearer {token}"},
         )
         if resp.status_code == 401 and _retry:
-            # token rejected early (e.g. server restarted, secret rotated) -> re-login once
+            # token 提前失效（如服务端重启、secret 轮换）-> 透明重登一次
             self._token = None
             token = await self.login()
             resp = await self._http.post(

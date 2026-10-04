@@ -1,4 +1,4 @@
-"""Unit tests for redaction, profiles, and client logic."""
+"""redaction、profiles、client 三个模块的单元测试"""
 
 import base64
 import json
@@ -11,7 +11,7 @@ from dpanel_mcp.profiles import ProfileGate, TOOLS
 from dpanel_mcp.redaction import redact, redact_text
 
 
-# ------------------------------------------------------------------ redaction
+# ------------------------------------------------------------------ 脱敏测试
 
 def test_redact_dict_keys():
     obj = {"username": "admin", "password": "hunter2", "token": "abc", "nested": {"apiKey": "k"}}
@@ -47,7 +47,7 @@ def test_redact_list():
     assert out[1]["ok"] == 1
 
 
-# ------------------------------------------------------------------- profiles
+# ------------------------------------------------------------------- 能力分级测试
 
 def test_profile_ranking():
     ro = ProfileGate(Config(profile="read-only"))
@@ -75,13 +75,13 @@ def test_destructive_needs_confirm():
 
 
 def test_every_tool_has_entry():
-    # every tool in TOOLS has a valid (profile, destructive) tuple
+    # TOOLS 中每个工具都必须带有合法的 (profile, destructive) 元组
     for name, (minimum, destructive) in TOOLS.items():
         assert minimum in ("read-only", "read-write", "admin"), name
         assert isinstance(destructive, bool), name
 
 
-# --------------------------------------------------------------------- client
+# --------------------------------------------------------------------- 客户端测试
 
 def _make_jwt(exp: float) -> str:
     header = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).rstrip(b"=")
@@ -119,11 +119,11 @@ def test_api_base():
     assert c.api_base == "http://127.0.0.1:8807/dpanel/api"
 
 
-# ------------------------------------------------------- 1.11.0 route contract
+# ------------------------------------------------------- 1.11.0 路由契约测试
 
-# Routes verified against a live DPanel 1.11.0 container (probe evidence in
-# /tmp/route_probe.json during development). Every path used by tools.py must
-# be in the verified-exists set.
+# 下列路由均已对照真实 DPanel 1.11.0 容器逐一验证（探测证据见开发期
+# /tmp/route_probe.json）。tools.py 中使用的每条路径都必须
+# 命中已验证存在的集合。
 VERIFIED_ROUTES = {
     "/common/home/info", "/common/panel/usage", "/common/home/get-stat-list",
     "/common/setting/get-setting", "/common/log/get-list",
@@ -169,7 +169,7 @@ VERIFIED_ROUTES = {
 
 
 def test_tools_use_only_verified_routes():
-    """Extract every _call("path") in tools.py and assert it exists on 1.11.0."""
+    """提取 tools.py 中所有 _call("path") 并断言每条路由都在 1.11.0 已验证集合中"""
     import os
     import re
 
@@ -182,7 +182,7 @@ def test_tools_use_only_verified_routes():
 
 
 def test_explorer_mountpoint_validation():
-    """_mp() must reject invalid mountPoint formats with a helpful error."""
+    """_mp() 必须拒绝非法 mountPoint 格式并给出可读错误"""
     from dpanel_mcp.client import DPanelApiError
     from dpanel_mcp.tools import _mp
 

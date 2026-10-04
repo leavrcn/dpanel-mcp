@@ -1,4 +1,4 @@
-"""DPanel MCP Server configuration (env-driven)."""
+"""dpanel-mcp 服务配置（环境变量驱动）"""
 
 from __future__ import annotations
 
@@ -8,31 +8,31 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Config:
-    """Runtime configuration, all overridable via environment variables."""
+    """运行时配置，所有字段均可通过环境变量覆盖"""
 
-    # --- DPanel connection ---
-    # e.g. http://127.0.0.1:8807  (no trailing slash; /dpanel/api is appended)
+    # --- DPanel 连接 ---
+    # 示例：http://127.0.0.1:8807（不带尾部斜杠；/dpanel/api 会自动拼接）
     dpanel_host: str = field(
         default_factory=lambda: os.getenv("DPANEL_HOST", "http://127.0.0.1:8807").rstrip("/")
     )
     dpanel_username: str = field(default_factory=lambda: os.getenv("DPANEL_USERNAME", ""))
     dpanel_password: str = field(default_factory=lambda: os.getenv("DPANEL_PASSWORD", ""))
-    # autoLogin -> 30d token; otherwise 24h token
+    # autoLogin -> 30 天 token；否则 24 小时
     dpanel_auto_login: bool = field(
         default_factory=lambda: os.getenv("DPANEL_AUTO_LOGIN", "1") not in ("0", "false", "no")
     )
-    # verify TLS for the DPanel instance
+    # 是否校验 DPanel 实例的 TLS 证书
     dpanel_tls_verify: bool = field(
         default_factory=lambda: os.getenv("DPANEL_TLS_VERIFY", "1") not in ("0", "false", "no")
     )
 
-    # --- MCP capability profile ---
+    # --- MCP 能力分级 ---
     # read-only | read-write | admin
     profile: str = field(
         default_factory=lambda: os.getenv("DPANEL_MCP_PROFILE", "read-write").lower()
     )
 
-    # --- transport ---
+    # --- 传输方式 ---
     # stdio | streamable-http
     transport: str = field(
         default_factory=lambda: os.getenv("DPANEL_MCP_TRANSPORT", "stdio").lower()

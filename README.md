@@ -2,7 +2,7 @@
 
 DPanel 的 MCP (Model Context Protocol) 服务器。将 DPanel 的 Docker 管理能力暴露为 MCP 工具，供 AI Agent 调用。
 
-独立项目，按 DPanel 版本对齐发布：**dpanel-mcp 1.11.0 ↔ DPanel 1.11.x**。主仓库在 [AgentSkills/dpanel-mcp](http://10.1.1.10:23300/AgentSkills/dpanel-mcp)（自托管 Gitea），[leavrcn/dpanel-mcp](https://github.com/leavrcn/dpanel-mcp) 为 GitHub 公开镜像。
+独立项目，按 DPanel 版本对齐发布：**dpanel-mcp 1.11.0 ↔ DPanel 1.11.x**。仓库地址：[GitHub leavrcn/dpanel-mcp](https://github.com/leavrcn/dpanel-mcp)。
 
 参考 [portainer/portainer-mcp](https://github.com/portainer/portainer-mcp) 的架构设计（能力分级、脱敏、fail-closed 破坏性操作确认）。
 
@@ -72,21 +72,27 @@ uvx --from git+https://github.com/leavrcn/dpanel-mcp dpanel-mcp
 
 客户端配置：`{"url": "http://host:8090/mcp", "headers": {"Authorization": "Bearer shared-secret"}}`
 
-### 4. Docker 双容器部署（推荐生产方式）
+### 4. Docker 联合部署（推荐生产方式）
 
-MCP 作为独立容器与 DPanel 容器同网络运行，只走 HTTP，不需要挂载 docker.sock：
+DPanel 与 dpanel-mcp 作为两个容器在同一网络运行，MCP 只通过 HTTP 访问 DPanel，无需挂载 docker.sock。
+
+仓库根目录已提供联合部署示例 `docker-compose.example.yml`（内含 DPanel 1.11.x + dpanel-mcp 完整编排）：
 
 ```bash
-# 仓库根目录执行
-docker compose -f mcp/docker-compose.example.yml up -d
+# 1. 拷贝并按需修改密码/token
+cp docker-compose.example.yml docker-compose.yml
+# 编辑 docker-compose.yml，替换所有 CHANGE_ME 占位符
 
-# 首次启动需创建 DPanel founder 账号（免鉴权接口）
+# 2. 启动
+docker compose up -d
+
+# 3. 首次启动需创建 DPanel founder 账号（免鉴权接口）
 curl -s http://127.0.0.1:8807/dpanel/api/common/user/create-founder \
   -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"ChangeMe-2026!","confirmPassword":"ChangeMe-2026!"}'
+  -d '{"username":"admin","password":"你的强密码","confirmPassword":"你的强密码"}'
 ```
 
-单独构建镜像：`docker build -t dpanel-mcp:latest mcp/`
+单独构建 MCP 镜像：`docker build -t dpanel-mcp:latest .`
 
 要点：
 

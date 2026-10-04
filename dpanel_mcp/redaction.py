@@ -1,7 +1,7 @@
-"""Redaction of sensitive values in tool output (passwords, tokens, secrets).
+"""工具返回值中敏感值（密码、token、secret）的脱敏。
 
-Applied recursively to any dict/list returned by a tool before it is
-serialized to the MCP client. Redaction is always on (frozen decision 9B).
+对工具返回的任意 dict/list 在序列化给 MCP 客户端前递归执行。
+脱敏始终开启（冻结决策 9B）。
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from typing import Any
 
 MASK = "******"
 
-# key names (lowercased, separators normalized) that always get masked
+# 始终脱敏的键名（小写、分隔符归一化后匹配）
 SENSITIVE_KEYS = {
     "password", "passwd", "secret", "token", "accesstoken", "refreshtoken",
     "apikey", "api_key", "accesskey", "secretkey", "privatekey", "private_key",
@@ -20,12 +20,12 @@ SENSITIVE_KEYS = {
     "tlskey", "tls_key", "certkey", "passphrase",
 }
 
-# environment-variable style: NAME=VALUE where NAME smells sensitive
+# 环境变量风格：NAME=VALUE 且 NAME 含敏感特征
 _ENV_RE = re.compile(
     r"(?i)\b([A-Z0-9_]*(?:PASSWORD|PASSWD|SECRET|TOKEN|KEY|CREDENTIAL|JWT)[A-Z0-9_]*)\s*=\s*([^\s\"']+)"
 )
 
-# long bearer-ish strings inside free text (JWTs are xxx.yyy.zzz)
+# 自由文本中的长 Bearer 风格字符串（JWT 为 xxx.yyy.zzz 格式）
 _JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}\b")
 
 
@@ -39,14 +39,14 @@ def _is_sensitive_key(key: str) -> bool:
 
 
 def redact_text(text: str) -> str:
-    """Mask env-style assignments and JWTs inside free-form text (e.g. logs)."""
+    """对自由文本（如日志）中的 KEY=VALUE 形式赋值与 JWT 做脱敏"""
     text = _ENV_RE.sub(lambda m: f"{m.group(1)}={MASK}", text)
     text = _JWT_RE.sub(MASK, text)
     return text
 
 
 def redact(obj: Any) -> Any:
-    """Recursively redact a JSON-like structure."""
+    """递归脱敏 JSON 结构"""
     if isinstance(obj, dict):
         out = {}
         for k, v in obj.items():

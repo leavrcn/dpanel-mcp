@@ -1,15 +1,14 @@
-"""MCP tools bridging to the DPanel panel API (aligned to DPanel 1.11.0).
+"""MCP 工具层，桥接 DPanel 面板 API（已对齐 DPanel 1.11.0）。
 
-Every tool:
-  1. checks the profile gate (profiles.py)
-  2. destructive tools require an explicit confirm=True argument
-     (fail-closed human-in-the-loop; frozen decision 8A)
-  3. calls the DPanel API via client.post()
-  4. redacts sensitive values before returning (frozen decision 9B)
+每个工具的执行链路：
+  1. 检查能力分级门禁（profiles.py）
+  2. 破坏性工具要求显式 confirm=True 参数
+     （fail-closed 人在回路确认；冻结决策 8A）
+  3. 通过 client.post() 调用 DPanel API
+  4. 返回前对敏感值脱敏（冻结决策 9B）
 
-Route/parameter contract below was verified against a live DPanel 1.11.0
-container (empty-body probes expose required fields; happy paths exercised
-end-to-end: compose create -> deploy -> ctrl stop -> destroy).
+下列路由/参数契约已对照真实 DPanel 1.11.0 容器逐一验证
+（空 body 探测暴露必填字段；compose 创建→部署→停止→销毁全链路实测）。
 """
 
 from __future__ import annotations
@@ -31,7 +30,7 @@ _gate: ProfileGate | None = None
 
 
 def bind(config: Config) -> DPanelClient:
-    """Create the shared client + gate. Called once at startup."""
+    """创建共享 client 与门禁，启动时调用一次"""
     global _client, _gate
     _client = DPanelClient(config)
     _gate = ProfileGate(config)
@@ -666,7 +665,7 @@ async def dpanel_volume_prune(confirm: bool = False) -> str:
 # =================================================================== explorer
 
 def _mp(mount_point: str) -> str:
-    """Validate explorer mountPoint format: volume:<name> | container:<md5> | docker:<env>."""
+    """校验 explorer 挂载点格式：volume:<名称> | container:<md5> | docker:<环境>"""
     if not any(mount_point.startswith(p) for p in ("volume:", "container:", "docker:")):
         raise DPanelApiError(
             "mountPoint must be 'volume:<name>', 'container:<md5>' or 'docker:<env>' "

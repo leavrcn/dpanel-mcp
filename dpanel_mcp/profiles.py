@@ -1,19 +1,19 @@
-"""Capability profiles: which tool groups each profile may call.
+"""能力分级：每个分级允许调用哪些工具组。
 
-Profiles (mirroring portainer-mcp):
-  - read-only   : inspection only (lists, details, stats, logs)
-  - read-write  : read-only + lifecycle operations (start/stop/restart, deploy, create)
-  - admin       : read-write + destructive operations (delete, prune, restore)
+分级设计（参考 portainer-mcp）：
+  - read-only   : 仅查询（列表、详情、统计、日志）
+  - read-write  : read-only + 生命周期操作（start/stop/restart、deploy、create）
+  - admin       : read-write + 破坏性操作（delete、prune、restore）
 
-Destructive tools are additionally gated behind an explicit confirm=true
-argument (fail-closed human-in-the-loop) regardless of profile.
+破坏性工具在任何分级下都要求显式 confirm=true 参数
+（fail-closed 人在回路确认）。
 """
 
 from __future__ import annotations
 
 from .config import Config
 
-# tool-name prefix -> minimum profile that may use it
+# 工具名前缀 -> 允许使用的最低能力分级
 READ_ONLY = "read-only"
 READ_WRITE = "read-write"
 ADMIN = "admin"
@@ -21,10 +21,10 @@ ADMIN = "admin"
 _PROFILE_RANK = {READ_ONLY: 0, READ_WRITE: 1, ADMIN: 2}
 
 # ---------------------------------------------------------------------------
-# tool registry: name -> (minimum profile, destructive?)
+# 工具注册表：名称 -> (最低分级, 是否破坏性)
 #
-# Destructive tools always require admin AND a confirmation step.
-# Aligned to DPanel 1.11.0 routes (see tools.py docstring).
+# 破坏性工具始终要求 admin 能力分级 + 显式确认。
+# 路由已对齐 DPanel 1.11.0（详见 tools.py docstring）。
 # ---------------------------------------------------------------------------
 
 TOOLS: dict[str, tuple[str, bool]] = {
@@ -146,7 +146,7 @@ TOOLS: dict[str, tuple[str, bool]] = {
 
 
 class ProfileGate:
-    """Decide whether the configured profile may call a given tool."""
+    """判断当前配置的能力分级是否允许调用指定工具"""
 
     def __init__(self, config: Config):
         self.profile = config.profile

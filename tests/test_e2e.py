@@ -1,9 +1,9 @@
-"""End-to-end MCP protocol test against the live DPanel instance.
+"""针对真实 DPanel 实例的端到端 MCP 协议测试。
 
-Spawns the server in stdio mode, speaks MCP over JSON-RPC, and exercises:
-  - initialize handshake
-  - tools/list (profile filtering)
-  - tools/call on read-only, write, destructive (fail-closed), and redaction
+以 stdio 模式启动服务进程，通过 JSON-RPC 走 MCP 协议，覆盖：
+  - initialize 握手
+  - tools/list（按能力分级过滤）
+  - tools/call：只读、写入、破坏性（fail-closed）、脱敏
 """
 
 import json
@@ -16,7 +16,8 @@ ENV = {
     **os.environ,
     "DPANEL_HOST": "http://127.0.0.1:8807",
     "DPANEL_USERNAME": "mcpadmin",
-    "DPANEL_PASSWORD": "McpTest-2026!",
+    # 测试密码优先从环境变量读，未设置时用本地占位符（仅用于本地开发容器，不入生产）
+    "DPANEL_PASSWORD": os.environ.get("DPANEL_TEST_PASSWORD", "McpTest-2026!"),
     "DPANEL_MCP_PROFILE": "admin",
     "DPANEL_MCP_TRANSPORT": "stdio",
 }
@@ -78,7 +79,7 @@ def main():
 
     mcp = McpStdio()
     try:
-        # 1. initialize
+        # 1. 初始化握手
         resp = mcp.request(
             "initialize",
             {
@@ -91,7 +92,7 @@ def main():
         print(f"[1] initialize OK -> server: {server_name}")
         mcp.notify("notifications/initialized")
 
-        # 2. tools/list
+        # 2. tools/list 工具列表
         resp = mcp.request("tools/list", {})
         tools = resp["result"]["tools"]
         names = [t["name"] for t in tools]
@@ -99,7 +100,7 @@ def main():
         if len(names) < 85:
             failures.append(f"expected >=85 tools, got {len(names)}")
 
-        # 3. read-only call: container list (1.11.0: md5/siteTitle filter, no paging)
+        # 3. 只读调用：容器列表（1.11.0：md5/siteTitle 过滤，无分页）
         resp = mcp.request(
             "tools/call",
             {"name": "dpanel_container_list", "arguments": {}},
@@ -111,12 +112,12 @@ def main():
         if n == 0:
             failures.append("container list empty")
 
-        # 4. system info
+        # 4. 系统信息
         resp = mcp.request("tools/call", {"name": "dpanel_system_info", "arguments": {}})
         text = resp["result"]["content"][0]["text"]
         print(f"[4] dpanel_system_info OK -> {text[:120]}...")
 
-        # 4b. system usage (1.11.0: /common/panel/usage)
+        # 4b. 资源占用（1.11.0：/common/panel/usage）
         resp = mcp.request("tools/call", {"name": "dpanel_system_usage", "arguments": {}})
         body = resp["result"]
         if body.get("isError"):
@@ -124,7 +125,7 @@ def main():
         else:
             print("[4b] dpanel_system_usage OK (1.11.0 /common/panel/usage)")
 
-        # 4c. explorer with mountPoint (1.11.0 contract)
+        # 4c. explorer 挂载点调用（1.11.0 契约）
         resp = mcp.request(
             "tools/call",
             {"name": "dpanel_explorer_list", "arguments": {"mount_point": "volume:dpanel-fix-test", "path": "/"}},
@@ -138,7 +139,7 @@ def main():
         else:
             print("[4c] explorer volume mount OK (1.11.0 mountPoint contract)")
 
-        # 4d. compose list (1.11.0: id-based)
+        # 4d. compose 列表（1.11.0：按 id）
         resp = mcp.request("tools/call", {"name": "dpanel_compose_list", "arguments": {}})
         body = resp["result"]
         if body.get("isError"):
@@ -147,7 +148,7 @@ def main():
             data = json.loads(body["content"][0]["text"])
             print(f"[4d] compose_list OK -> {len(data.get('list', []))} projects")
 
-        # 5. destructive fail-closed: delete without confirm
+        # 5. 破坏性操作 fail-closed：不传 confirm 直接拒绝
         resp = mcp.request(
             "tools/call",
             {"name": "dpanel_container_delete", "arguments": {"md5": "deadbeef"}},
@@ -159,17 +160,17 @@ def main():
         if not is_error:
             failures.append("destructive tool did not fail-closed without confirm")
 
-        # 6. redaction check: no raw password in output
+        # 6. 脱敏检查：输出中不得出现明文密码
         resp = mcp.request(
             "tools/call",
             {"name": "dpanel_container_list", "arguments": {}},
         )
         text = resp["result"]["content"][0]["text"]
-        if "McpTest-2026" in text:
+        if ENV["DPANEL_PASSWORD"] in text:
             failures.append("password leaked in container list output")
         print("[6] redaction check OK (no password leak in list output)")
 
-        # 7. profile gate: read-write tool under admin (allowed; expect API-level error)
+        # 7. 能力分级门禁：admin 下调用读写工具（允许；预期返回 API 层错误）
         resp = mcp.request(
             "tools/call",
             {"name": "dpanel_container_status", "arguments": {"md5": "deadbeef", "operate": "start"}},
@@ -180,9 +181,8 @@ def main():
             failures.append("gate error for admin profile on read-write tool")
         print(f"[7] container_status allowed under admin (isError={body.get('isError')}) — expected API-level error, not gate error")
 
-        # 8. unknown-route diagnosis (I1): call a tool against a bad route is
-        #    not possible anymore (all routes verified), so verify the client
-        #    HTML detection via a direct unit check instead — skipped here.
+        # 8. 未知路由诊断（I1）：所有路由均已验证存在，无法再构造坏路由，
+        #    客户端 HTML 识别逻辑改由单元测试覆盖——此处跳过。
 
         print()
         if failures:

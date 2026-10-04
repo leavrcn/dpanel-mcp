@@ -1,4 +1,4 @@
-"""Server entrypoint: stdio or streamable-http transport."""
+"""服务入口：stdio 或 streamable-http 两种传输方式"""
 
 from __future__ import annotations
 
