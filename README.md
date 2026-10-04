@@ -92,7 +92,12 @@ curl -s http://127.0.0.1:8807/dpanel/api/common/user/create-founder \
   -d '{"username":"admin","password":"你的强密码","confirmPassword":"你的强密码"}'
 ```
 
-单独构建 MCP 镜像：`docker build -t dpanel-mcp:latest .`
+单独构建 MCP 镜像（开发/自改代码时）：`docker build -t dpanel-mcp:latest .`
+
+镜像发布渠道：
+
+- ghcr.io：`ghcr.io/leavrcn/dpanel-mcp:1.11.0`（双架构 amd64/arm64，compose 默认拉取此镜像）
+- 推送 `v*` tag 自动构建发布（GitHub Actions），也可在 Actions 页面手动触发
 
 要点：
 
