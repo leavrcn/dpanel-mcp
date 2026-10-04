@@ -81,7 +81,7 @@ DPanel 与 dpanel-mcp 作为两个容器在同一网络运行，MCP 只通过 HT
 ```bash
 # 1. 拷贝并按需修改密码/token
 cp docker-compose.example.yml docker-compose.yml
-# 编辑 docker-compose.yml，替换所有 CHANGE_ME 占位符
+# 创建 .env 文件并填入实际值（DP_JWT_SECRET / DPANEL_ADMIN_PASSWORD / DPANEL_MCP_AUTH_TOKEN）
 
 # 2. 启动
 docker compose up -d

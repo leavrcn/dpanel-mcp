@@ -2,19 +2,25 @@
 # 版本对齐：dpanel/dpanel:1.11.0 ↔ dpanel-mcp 1.11.0
 #
 # 使用步骤：
-#   1. 拷贝本文件为 docker-compose.yml 并替换所有 CHANGE_ME 占位符
-#   2. docker compose up -d
-#   3. 首次启动创建 DPanel founder 账号（免鉴权接口）：
+#   1. 拷贝本文件为 docker-compose.yml
+#   2. 在同目录创建 .env 文件，填入实际值（不要提交到 git）：
+#        DP_JWT_SECRET=<固定随机字符串>
+#        DPANEL_ADMIN_PASSWORD=<你的强密码>
+#        DPANEL_MCP_AUTH_TOKEN=<长随机 token>
+#   3. docker compose up -d
+#   4. 首次启动创建 DPanel founder 账号（免鉴权接口）：
 #        curl -s http://127.0.0.1:8807/dpanel/api/common/user/create-founder \
 #          -H 'Content-Type: application/json' \
-#          -d '{"username":"admin","password":"你的强密码","confirmPassword":"你的强密码"}'
-#   4. MCP 客户端接入 http://127.0.0.1:8090/mcp
+#          -d '{"username":"admin","password":"<同 .env 中 DPANEL_ADMIN_PASSWORD>","confirmPassword":"<同 .env 中 DPANEL_ADMIN_PASSWORD>"}'
+#   5. MCP 客户端接入 http://127.0.0.1:8090/mcp
 #      请求头：Authorization: Bearer <DPANEL_MCP_AUTH_TOKEN 的值>
 #
 # 注意：
-#   - 所有 CHANGE_ME 均为占位符，生产环境必须替换
+#   - 敏感配置统一走同目录 .env 文件，compose 文件本身可以安全入库
 #   - DP_JWT_SECRET 固定后 DPanel 重启不会使 MCP 会话失效
 #   - dpanel-mcp 容器无需挂载 docker.sock，仅通过 HTTP 与 DPanel 通信
+#   - 端口默认仅绑定 127.0.0.1（仅本机访问）；需局域网/公网访问时改为 0.0.0.0 或加防火墙
+#   - DPanel 镜像 tag：官方 latest 即当前稳定版（1.11.0），暂无独立版本 tag
 #
 # 存储路径：
 #   - dpanel 数据默认绑定挂载到宿主机 /opt/dpanel（备份/迁移直接打包该目录即可），
@@ -23,14 +29,14 @@
 
 services:
   dpanel:
-    image: dpanel/dpanel:1.11.0
+    image: dpanel/dpanel:latest
     container_name: dpanel
     restart: unless-stopped
     ports:
-      - "8807:8080"                        # DPanel Web UI / API
+      - "127.0.0.1:8807:8080"              # DPanel Web UI / API（仅本机访问）
     environment:
       APP_NAME: dpanel
-      DP_JWT_SECRET: "CHANGE_ME_FIXED_JWT_SECRET"
+      DP_JWT_SECRET: "${DP_JWT_SECRET:?请在 .env 中设置}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/dpanel:/dpanel            # DPanel 数据（数据库/compose 项目/网站），改为你的宿主机路径
@@ -47,6 +53,7 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile
+      # 已构建过镜像想跳过重编译：docker compose up -d --no-build
     image: dpanel-mcp:1.11.0
     container_name: dpanel-mcp
     restart: unless-stopped
@@ -54,16 +61,16 @@ services:
       dpanel:
         condition: service_healthy
     ports:
-      - "8090:8090"                        # MCP streamable-http 端点
+      - "127.0.0.1:8090:8090"              # MCP streamable-http 端点（仅本机访问）
     environment:
       DPANEL_HOST: http://dpanel:8080      # compose 内部服务名 + 容器内部端口
       DPANEL_USERNAME: admin
-      DPANEL_PASSWORD: "CHANGE_ME_ADMIN_PASSWORD"
+      DPANEL_PASSWORD: "${DPANEL_ADMIN_PASSWORD:?请在 .env 中设置}"
       DPANEL_MCP_TRANSPORT: streamable-http
       DPANEL_MCP_HTTP_HOST: 0.0.0.0
       DPANEL_MCP_HTTP_PORT: "8090"
       DPANEL_MCP_HTTP_PATH: /mcp
-      DPANEL_MCP_AUTH_TOKEN: "CHANGE_ME_LONG_RANDOM_TOKEN"
+      DPANEL_MCP_AUTH_TOKEN: "${DPANEL_MCP_AUTH_TOKEN:?请在 .env 中设置}"
       DPANEL_MCP_PROFILE: read-write
     networks:
       - dpanel-net
