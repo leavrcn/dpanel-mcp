@@ -68,3 +68,5 @@ networks:
 
 volumes:
   dpanel-data:
+    driver: local
+
