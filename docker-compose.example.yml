@@ -1,45 +1,70 @@
 # DPanel + dpanel-mcp 联合部署示例
-# 版本对齐：dpanel/dpanel:1.11.0 ↔ dpanel-mcp 1.11.0
+# 版本对齐：dpanel/dpanel:latest（当前稳定版 1.11.0）↔ dpanel-mcp 1.11.0
 #
-# 使用步骤：
+# ══════════════════════════════════════════════════════════════════════
+# 部署步骤
+# ══════════════════════════════════════════════════════════════════════
+#
 #   1. 拷贝本文件为 docker-compose.yml
-#   2. 在同目录创建 .env 文件，填入实际值（不要提交到 git）：
-#        DP_JWT_SECRET=<固定随机字符串>
-#        DPANEL_ADMIN_PASSWORD=<你的强密码>
-#        DPANEL_MCP_AUTH_TOKEN=<长随机 token>
-#   3. docker compose up -d
-#   4. 首次启动创建 DPanel founder 账号（免鉴权接口）：
+#
+#   2. 拷贝 .env.example 为 .env，填入实际值（.env 已在 .gitignore，不会入库）：
+#        DP_JWT_SECRET=<固定随机字符串，如 openssl rand -hex 32>
+#        DPANEL_ADMIN_PASSWORD=<DPanel 管理员密码>
+#        DPANEL_MCP_AUTH_TOKEN=<MCP 端点认证 token，如 openssl rand -hex 32>
+#
+#   3. 按需修改下方「用户改动点」标注处（端口、存储路径、能力分级等）
+#
+#   4. docker compose up -d
+#
+#   5. 首次启动创建 DPanel founder 账号（免鉴权接口）：
 #        curl -s http://127.0.0.1:8807/dpanel/api/common/user/create-founder \
 #          -H 'Content-Type: application/json' \
 #          -d '{"username":"admin","password":"<同 .env 中 DPANEL_ADMIN_PASSWORD>","confirmPassword":"<同 .env 中 DPANEL_ADMIN_PASSWORD>"}'
-#   5. MCP 客户端接入 http://127.0.0.1:8090/mcp
-#      请求头：Authorization: Bearer <DPANEL_MCP_AUTH_TOKEN 的值>
 #
-# 注意：
-#   - 敏感配置统一走同目录 .env 文件，compose 文件本身可以安全入库
+#   6. MCP 客户端接入 http://127.0.0.1:8090/mcp
+#      请求头：Authorization: Bearer <.env 中 DPANEL_MCP_AUTH_TOKEN 的值>
+#
+# ══════════════════════════════════════════════════════════════════════
+# 用户改动点速查（标注 ✅ 的地方需要按需修改）
+# ══════════════════════════════════════════════════════════════════════
+#
+#   ✅ .env 三个变量              — 必改（步骤 2）
+#   ✅ dpanel 端口 8807            — 若被占用改左侧宿主机端口，如 "127.0.0.1:18807:8080"
+#   ✅ dpanel 存储路径 /opt/dpanel  — 改为你的宿主机路径
+#   ✅ dpanel-mcp 端口 8090        — 若被占用改左侧宿主机端口，如 "127.0.0.1:18090:8090"
+#   ✅ DPANEL_MCP_PROFILE          — 按需收窄为 read-only 或放宽为 admin
+#   ✅ 端口对外                    — 默认仅 127.0.0.1，对外需改为 0.0.0.0
+#
+# ══════════════════════════════════════════════════════════════════════
+# 注意事项
+# ══════════════════════════════════════════════════════════════════════
+#
+#   - 敏感配置统一走 .env 文件，compose 文件本身可以安全入库
 #   - DP_JWT_SECRET 固定后 DPanel 重启不会使 MCP 会话失效
 #   - dpanel-mcp 容器无需挂载 docker.sock，仅通过 HTTP 与 DPanel 通信
-#   - 端口默认仅绑定 127.0.0.1（仅本机访问）；需局域网/公网访问时改为 0.0.0.0 或加防火墙
 #   - DPanel 镜像 tag：官方 latest 即当前稳定版（1.11.0），暂无独立版本 tag
-#
-# 存储路径：
-#   - dpanel 数据默认绑定挂载到宿主机 /opt/dpanel（备份/迁移直接打包该目录即可），
-#     可自行改为其他绝对路径，或用相对路径 ./data/dpanel 跟随 compose 文件
-#   - dpanel-mcp 为无状态容器（配置全走环境变量），无需任何存储卷
+#   - dpanel-mcp 镜像 tag 必须与 dpanel-mcp 发布版本对齐（当前 1.11.0）
+#   - 已构建过镜像想跳过重编译：docker compose up -d --no-build
+#   - 如需升级 dpanel-mcp：修改 image tag → docker compose up -d --build
 
 services:
   dpanel:
-    image: dpanel/dpanel:latest
+    image: dpanel/dpanel:latest          # 官方 latest 即当前稳定版 1.11.0
     container_name: dpanel
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8807:8080"              # DPanel Web UI / API（仅本机访问）
+      # ✅ 左侧为宿主机端口，若 8807 被占用可改为其他端口（如 18807）
+      # ✅ 默认仅绑定 127.0.0.1（仅本机访问）；需对外改为 "0.0.0.0:8807:8080"
+      - "127.0.0.1:8807:8080"
     environment:
       APP_NAME: dpanel
+      # 从 .env 读取，请勿在此硬编码
       DP_JWT_SECRET: "${DP_JWT_SECRET:?请在 .env 中设置}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /opt/dpanel:/dpanel            # DPanel 数据（数据库/compose 项目/网站），改为你的宿主机路径
+      # ✅ 改为你的宿主机路径，DPanel 全部数据（数据库/compose 项目/网站文件）都在此目录下
+      #    备份/迁移直接打包该目录即可；也可用相对路径 ./data/dpanel 跟随 compose 文件
+      - /opt/dpanel:/dpanel
     networks:
       - dpanel-net
     healthcheck:
@@ -53,28 +78,36 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile
-      # 已构建过镜像想跳过重编译：docker compose up -d --no-build
-    image: dpanel-mcp:1.11.0
+    image: dpanel-mcp:1.11.0             # ✅ 升级 dpanel-mcp 版本时修改此 tag
     container_name: dpanel-mcp
     restart: unless-stopped
     depends_on:
       dpanel:
         condition: service_healthy
     ports:
-      - "127.0.0.1:8090:8090"              # MCP streamable-http 端点（仅本机访问）
+      # ✅ 左侧为宿主机端口，若 8090 被占用可改为其他端口（如 18090）
+      # ✅ 默认仅绑定 127.0.0.1；MCP 客户端不在本机时改为 "0.0.0.0:8090:8090"
+      - "127.0.0.1:8090:8090"
     environment:
-      DPANEL_HOST: http://dpanel:8080      # compose 内部服务名 + 容器内部端口
+      # compose 内部服务名 + 容器内部端口，无需修改
+      DPANEL_HOST: http://dpanel:8080
+      # DPanel 管理员账号（需与步骤 5 创建的 founder 账号一致）
       DPANEL_USERNAME: admin
+      # 从 .env 读取，请勿在此硬编码
       DPANEL_PASSWORD: "${DPANEL_ADMIN_PASSWORD:?请在 .env 中设置}"
       DPANEL_MCP_TRANSPORT: streamable-http
       DPANEL_MCP_HTTP_HOST: 0.0.0.0
       DPANEL_MCP_HTTP_PORT: "8090"
       DPANEL_MCP_HTTP_PATH: /mcp
+      # 从 .env 读取，MCP 客户端请求头携带此 token
       DPANEL_MCP_AUTH_TOKEN: "${DPANEL_MCP_AUTH_TOKEN:?请在 .env 中设置}"
+      # ✅ 按需收窄或放宽：
+      #    read-only  — 仅查询（列表、详情、日志），最安全
+      #    read-write — 查询 + 启停/部署/创建（默认）
+      #    admin      — 查询 + 写 + 删除/清理/恢复（需 confirm=true 确认）
       DPANEL_MCP_PROFILE: read-write
     networks:
       - dpanel-net
 
 networks:
   dpanel-net:
-
